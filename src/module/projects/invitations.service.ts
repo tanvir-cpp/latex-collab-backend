@@ -8,8 +8,14 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, IsNull, MoreThan, Repository } from 'typeorm';
+import {
+  AppEvent,
+  type InvitationAcceptedEvent,
+  type InvitationCreatedEvent,
+} from '../../common/events/app-events.js';
 import { sha256 } from '../../common/utils/hash.util.js';
 import { MailService } from '../mail/mail.service.js';
 import { UsersService } from '../users/users.service.js';
@@ -40,6 +46,7 @@ export class InvitationsService {
     private readonly mail: MailService,
     private readonly config: ConfigService,
     private readonly dataSource: DataSource,
+    private readonly events: EventEmitter2,
   ) {}
 
   async invite(projectId: string, inviterId: string, dto: InviteMemberDto): Promise<InvitationResponseDto> {
@@ -78,6 +85,15 @@ export class InvitationsService {
       // The invitation exists; the owner can revoke and re-send if the mail never arrives.
       this.logger.warn(`Could not deliver invitation ${invitation.id}`);
     }
+    this.events.emit(AppEvent.InvitationCreated, {
+      invitationId: invitation.id,
+      projectId,
+      projectName: project.name,
+      inviteeEmail: dto.email,
+      role: dto.role,
+      inviterId,
+      inviterName: inviter.fullName,
+    } satisfies InvitationCreatedEvent);
     return InvitationResponseDto.from(invitation);
   }
 
@@ -125,6 +141,14 @@ export class InvitationsService {
         .orIgnore()
         .execute();
     });
-    return this.projectsService.getForUser(invitation.projectId, userId);
+    const accepted = await this.projectsService.getForUser(invitation.projectId, userId);
+    this.events.emit(AppEvent.InvitationAccepted, {
+      projectId: invitation.projectId,
+      projectName: accepted.name,
+      inviterId: invitation.invitedById,
+      acceptedByUserId: userId,
+      acceptedByName: user.fullName,
+    } satisfies InvitationAcceptedEvent);
+    return accepted;
   }
 }
