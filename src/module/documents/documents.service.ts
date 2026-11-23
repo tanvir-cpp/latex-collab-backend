@@ -54,7 +54,15 @@ export class DocumentsService {
   ): Promise<Document> {
     await this.access.assertRole(projectId, userId, ProjectRole.Editor);
     if (Object.keys(dto).length > 0) {
-      const result = await this.documents.update({ id: documentId, projectId }, dto);
+      // A REST content edit replaces the text, so any stored Yjs history is stale and is dropped;
+      // the realtime layer re-seeds from `content` the next time the document is opened.
+      const result = await this.documents.update(
+        { id: documentId, projectId },
+        {
+          ...(dto.path !== undefined ? { path: dto.path } : {}),
+          ...(dto.content !== undefined ? { content: dto.content, yjsState: null } : {}),
+        },
+      );
       if (!result.affected) throw new NotFoundException('Document not found');
     }
     return this.get(projectId, documentId, userId);
@@ -98,5 +106,19 @@ export class DocumentsService {
     if (!document) throw new NotFoundException('Document not found');
     await this.access.assertRole(document.projectId, userId, minimum);
     return document;
+  }
+
+  /** Loads the document including its Yjs state (hidden from normal queries). No permission check. */
+  loadForCollab(documentId: string): Promise<Document | null> {
+    return this.documents
+      .createQueryBuilder('document')
+      .addSelect('document.yjsState')
+      .where('document.id = :documentId', { documentId })
+      .getOne();
+  }
+
+  /** Persists the live Yjs state together with a plain-text snapshot. */
+  async saveCollabState(documentId: string, state: Buffer, content: string): Promise<void> {
+    await this.documents.update({ id: documentId }, { yjsState: state, content });
   }
 }
