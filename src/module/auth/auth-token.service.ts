@@ -1,10 +1,9 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
+import { sha256 } from '../../common/utils/hash.util.js';
 import { AuthToken, AuthTokenType } from './entities/auth-token.entity.js';
-
-export const sha256 = (value: string) => createHash('sha256').update(value).digest('hex');
 
 @Injectable()
 export class AuthTokenService {

@@ -1,5 +1,4 @@
-const escapeHtml = (value: string) =>
-  value.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+import { escapeHtml } from '../../common/utils/html.util.js';
 
 export function verificationEmail(name: string, link: string) {
   return {
