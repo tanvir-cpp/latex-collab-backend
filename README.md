@@ -1,126 +1,90 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# LaTeX Collab Backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Backend for a real-time collaborative LaTeX editor: accounts, projects and `.tex` documents, live co-editing (Yjs over Socket.IO), chat, an LLM-powered assistant, email invitations and notifications. The Next.js frontend lives in a separate repository.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+**Stack:** NestJS 12 · TypeScript · PostgreSQL · TypeORM · Socket.IO · Yjs · Passport + JWT · `@nestjs-modules/mailer` · Swagger · class-validator · Vitest
 
-## Description
+## Getting started
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
+Requirements: Node.js 22+, pnpm, PostgreSQL 14+ (Docker optional).
 
 ```bash
-$ pnpm install
+pnpm install
+cp .env.example .env        # then fill in the values, see "Environment variables"
+docker compose up -d        # PostgreSQL + MailHog (or use your own PostgreSQL)
+pnpm migration:run          # create / update the schema
+pnpm start:dev
 ```
 
-## Compile and run the project
+- API: `http://localhost:3000/api`
+- Swagger UI: `http://localhost:3000/api/docs`
+- Liveness: `GET http://localhost:3000/health`
+- Dev mailbox (MailHog): `http://localhost:8025`
+
+## Database guide
+
+TypeORM never auto-syncs the schema (`synchronize: false`). All changes go through migrations in `src/migrations/`:
 
 ```bash
-# development
-$ pnpm run start
-
-# watch mode
-$ pnpm run start:dev
-
-# production mode
-$ pnpm run start:prod
+pnpm migration:generate src/migrations/AddSomething   # diff entities vs. database
+pnpm migration:run
+pnpm migration:revert
 ```
 
-## Run tests
+Migration commands build the project first and read connection settings from `.env`. To create the database manually: `createdb -U <user> <DB_NAME>`.
 
-```bash
-# unit tests
-$ pnpm run test
+## Environment variables
 
-# e2e tests
-$ pnpm run test:e2e
+All variables are validated at startup (`src/config/env.validation.ts`); the app refuses to boot if one is missing or invalid. See `.env.example`.
 
-# test coverage
-$ pnpm run test:cov
+| Variable | Required | Description |
+|---|---|---|
+| `NODE_ENV` | no | `development` (default), `production`, `test` |
+| `PORT` | no | HTTP port, default `3000` |
+| `FRONTEND_URL` | yes | Frontend origin; used for CORS and links in emails |
+| `DB_HOST` `DB_PORT` `DB_USER` `DB_PASSWORD` `DB_NAME` | yes | PostgreSQL connection (port defaults to `5432`) |
+| `JWT_SECRET` | yes | Signing secret, at least 32 characters |
+| `JWT_EXPIRES_IN` / `JWT_REFRESH_EXPIRES_IN` | no | Token lifetimes, default `15m` / `7d` |
+| `MAIL_HOST` `MAIL_PORT` `MAIL_FROM` | yes | SMTP server and sender |
+| `MAIL_USER` `MAIL_PASSWORD` | no | SMTP credentials (omit for MailHog) |
+| `LLM_API_KEY` | no | LLM provider key; AI endpoints are disabled without it |
+| `LLM_BASE_URL` / `LLM_MODEL` | no | Provider endpoint and model |
+
+## Architecture
+
+```
+src/
+  main.ts            bootstrap: prefix /api, CORS, ValidationPipe, Swagger
+  app.module.ts      root module
+  config/            env validation, TypeORM options, migration data source
+  common/            shared filters, guards, decorators
+  module/<name>/     one folder per feature: controller, service, module,
+                     entities/, dto/
+    auth, users            accounts, JWT/Passport, email verification, password reset
+    workspaces, projects,
+    documents              project and .tex document management
+    realtime, chat         Socket.IO gateway, Yjs sync, live chat
+    ai                     LLM assistant
+    notifications          persisted + pushed notifications
+    mail                   shared mailer service
 ```
 
-## Deployment
+Conventions: controllers handle HTTP only, services hold the rules, DTOs validated with class-validator, every error returned in the same JSON shape (`statusCode`, `message`, `path`, `timestamp`).
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+## Team and ownership
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+| Area | Branch |
+|---|---|
+| Auth, users, JWT, verification, password reset | `feature/auth-users` |
+| Workspaces, projects, documents, entities | `feature/projects-documents` |
+| Realtime (Yjs), chat, AI, notifications | `feature/realtime-ai` |
 
-```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
-```
+Shared: mailer, Swagger, validation/error handling, integration tests, environment configuration.
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+## Scripts
 
-## Observability
+`pnpm start:dev` · `pnpm build` · `pnpm lint` · `pnpm test` · `pnpm test:e2e` · `pnpm migration:run`
 
-In production applications, observability is essential for understanding how your system behaves, detecting issues early, and maintaining reliable performance.
+## Contributing
 
-[NestJS Observe](https://observe.nestjs.com) automatically instruments your NestJS application, giving you deep visibility into your system with minimal setup:
-
-- **Distributed tracing:** Follow requests across services and understand how they flow through your system.
-- **Waterfall analysis:** Visualize request execution and identify slow operations, bottlenecks, and unexpected delays.
-- **Performance analysis:** Analyze application performance in real time and quickly pinpoint areas that need optimization.
-- **Metrics:** Track key application and infrastructure metrics to understand system health and performance trends.
-- **Logging:** Centralize and correlate logs with traces and other telemetry to make debugging easier.
-- **Error tracking:** Detect errors quickly and investigate their root causes with the surrounding context.
-- **SLA monitoring:** Track service-level objectives and identify when your application is approaching or exceeding defined thresholds.
-- **Alarms and alerts:** Set up alerts for critical errors, performance degradation, SLA violations, and other anomalies so your team can react quickly.
-
-This project is already instrumented. To connect it, run this and approve the code it prints at [observe.nestjs.com/link](https://observe.nestjs.com/link) - signing up for free if you have no account:
-
-```bash
-$ npx @nestjs/observe link
-```
-
-It writes the app key and secret into `.env` and makes every `nest start` script (`start`, `start:dev`, `start:debug`) load it. In production, set `OBSERVE_APP_KEY` and `OBSERVE_APP_SECRET` in the environment instead.
-
-Or do it by hand: create an application and an API key at [observe.nestjs.com](https://observe.nestjs.com), and set the pair as `OBSERVE_APP_KEY` and `OBSERVE_APP_SECRET` in the environment the app runs in.
-
-The free plan needs no payment details and covers 300,000 events a month. You can also browse the [live demo](https://www.observe-demo.nestjs.com/dashboard) first - the whole dashboard over a busy service's data, with nothing to install.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Auto-instrument your application with [NestJS Observe](https://observe.nestjs.com). Distributed tracing, metrics, and logging made easy. Error tracking and performance monitoring for your NestJS applications.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+See [CONTRIBUTING.md](CONTRIBUTING.md).
