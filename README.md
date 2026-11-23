@@ -43,7 +43,7 @@ All variables are validated at startup (`src/config/env.validation.ts`); the app
 | `PORT` | no | HTTP port, default `3000` |
 | `FRONTEND_URL` | yes | Frontend origin; used for CORS and links in emails |
 | `DB_HOST` `DB_PORT` `DB_USER` `DB_PASSWORD` `DB_NAME` | yes | PostgreSQL connection (port defaults to `5432`) |
-| `JWT_SECRET` | yes | Signing secret, at least 32 characters |
+| `JWT_SECRET` / `JWT_REFRESH_SECRET` | yes | Access / refresh token signing secrets, at least 32 characters each |
 | `JWT_EXPIRES_IN` / `JWT_REFRESH_EXPIRES_IN` | no | Token lifetimes, default `15m` / `7d` |
 | `MAIL_HOST` `MAIL_PORT` `MAIL_FROM` | yes | SMTP server and sender |
 | `MAIL_USER` `MAIL_PASSWORD` | no | SMTP credentials (omit for MailHog) |
