@@ -1,9 +1,10 @@
 import { Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { DocumentsModule } from '../documents/documents.module.js';
 import { AiRateLimitGuard } from './ai-rate-limit.guard.js';
 import { AiController } from './ai.controller.js';
 import { AiService } from './ai.service.js';
-import { AnthropicProvider } from './anthropic.provider.js';
+import { createLlmProvider } from './llm.factory.js';
 import { LLM_PROVIDER } from './llm.provider.js';
 
 @Module({
@@ -12,8 +13,8 @@ import { LLM_PROVIDER } from './llm.provider.js';
   providers: [
     AiService,
     AiRateLimitGuard,
-    // Swap this binding to use a different LLM vendor.
-    { provide: LLM_PROVIDER, useClass: AnthropicProvider },
+    // The vendor is selected by LLM_PROVIDER (anthropic | openai | gemini).
+    { provide: LLM_PROVIDER, inject: [ConfigService], useFactory: createLlmProvider },
   ],
 })
 export class AiModule {}

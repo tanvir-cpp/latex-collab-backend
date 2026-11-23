@@ -18,6 +18,12 @@ enum NodeEnv {
   Test = 'test',
 }
 
+export enum LlmProviderName {
+  Anthropic = 'anthropic',
+  OpenAI = 'openai',
+  Gemini = 'gemini',
+}
+
 /** Every environment variable the backend reads. Validated once at boot. */
 export class EnvironmentVariables {
   @IsEnum(NodeEnv)
@@ -93,16 +99,22 @@ export class EnvironmentVariables {
   FRONTEND_URL: string;
 
   /** LLM provider (member 3). The key is optional so the app boots without AI. */
+  @IsEnum(LlmProviderName)
+  LLM_PROVIDER: LlmProviderName = LlmProviderName.Anthropic;
+
   @IsOptional()
   @IsString()
   LLM_API_KEY?: string;
 
-  @IsUrl({ require_tld: false })
-  LLM_BASE_URL: string = 'https://api.anthropic.com';
-
+  /** Required for openai and gemini; anthropic falls back to its own default model. */
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  LLM_MODEL: string = 'claude-opus-5-5';
+  LLM_MODEL?: string;
+
+  /** Optional endpoint override (proxies, OpenAI-compatible servers). Leave unset for the vendor default. */
+  @IsOptional()
+  @IsUrl({ require_tld: false })
+  LLM_BASE_URL?: string;
 }
 
 export function validateEnv(config: Record<string, unknown>) {
@@ -115,6 +127,11 @@ export function validateEnv(config: Record<string, unknown>) {
       .map((e) => `${e.property}: ${Object.values(e.constraints ?? {}).join(', ')}`)
       .join('\n');
     throw new Error(`Invalid environment configuration:\n${details}`);
+  }
+  if (validated.LLM_PROVIDER !== LlmProviderName.Anthropic && !validated.LLM_MODEL) {
+    throw new Error(
+      `Invalid environment configuration:\nLLM_MODEL: required when LLM_PROVIDER is ${validated.LLM_PROVIDER}`,
+    );
   }
   return validated;
 }

@@ -3,7 +3,6 @@ import {
   BadGatewayException,
   HttpException,
   HttpStatus,
-  Injectable,
   Logger,
   ServiceUnavailableException,
   UnprocessableEntityException,
@@ -12,9 +11,9 @@ import { ConfigService } from '@nestjs/config';
 import type { LlmProvider, LlmRequest } from './llm.provider.js';
 
 const MAX_OUTPUT_TOKENS = 16_000;
+const DEFAULT_MODEL = 'claude-opus-5-5';
 
 /** Claude via the official Anthropic SDK. Credentials and model come from the environment. */
-@Injectable()
 export class AnthropicProvider implements LlmProvider {
   private readonly logger = new Logger(AnthropicProvider.name);
   private readonly client: Anthropic | null;
@@ -22,10 +21,9 @@ export class AnthropicProvider implements LlmProvider {
 
   constructor(config: ConfigService) {
     const apiKey = config.get<string>('LLM_API_KEY');
-    this.model = config.getOrThrow<string>('LLM_MODEL');
-    this.client = apiKey
-      ? new Anthropic({ apiKey, baseURL: config.getOrThrow<string>('LLM_BASE_URL') })
-      : null;
+    this.model = config.get<string>('LLM_MODEL') || DEFAULT_MODEL;
+    const baseURL = config.get<string>('LLM_BASE_URL') || undefined;
+    this.client = apiKey ? new Anthropic({ apiKey, baseURL }) : null;
   }
 
   async complete({ system, messages }: LlmRequest): Promise<string> {
