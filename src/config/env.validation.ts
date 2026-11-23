@@ -55,6 +55,10 @@ export class EnvironmentVariables {
   JWT_SECRET: string;
 
   @IsString()
+  @MinLength(32)
+  JWT_REFRESH_SECRET: string;
+
+  @IsString()
   @IsNotEmpty()
   JWT_EXPIRES_IN: string = '15m';
 

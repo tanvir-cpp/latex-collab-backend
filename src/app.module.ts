@@ -4,7 +4,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller.js';
 import { buildDatabaseOptions } from './config/database.config.js';
 import { validateEnv } from './config/env.validation.js';
+import { AuthModule } from './module/auth/auth.module.js';
 import { MailModule } from './module/mail/mail.module.js';
+import { UsersModule } from './module/users/users.module.js';
 
 @Module({
   imports: [
@@ -14,6 +16,8 @@ import { MailModule } from './module/mail/mail.module.js';
       useFactory: buildDatabaseOptions,
     }),
     MailModule,
+    UsersModule,
+    AuthModule,
   ],
   controllers: [AppController],
 })
