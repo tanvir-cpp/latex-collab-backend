@@ -102,7 +102,7 @@ export class EnvironmentVariables {
 
   @IsString()
   @IsNotEmpty()
-  LLM_MODEL: string = 'claude-sonnet-5-5';
+  LLM_MODEL: string = 'claude-opus-5-5';
 }
 
 export function validateEnv(config: Record<string, unknown>) {
