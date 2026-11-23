@@ -47,8 +47,10 @@ All variables are validated at startup (`src/config/env.validation.ts`); the app
 | `JWT_EXPIRES_IN` / `JWT_REFRESH_EXPIRES_IN` | no | Token lifetimes, default `15m` / `7d` |
 | `MAIL_HOST` `MAIL_PORT` `MAIL_FROM` | yes | SMTP server and sender |
 | `MAIL_USER` `MAIL_PASSWORD` | no | SMTP credentials (omit for MailHog) |
-| `LLM_API_KEY` | no | LLM provider key; AI endpoints are disabled without it |
-| `LLM_BASE_URL` / `LLM_MODEL` | no | Anthropic API endpoint and model (default `claude-opus-5-5`) |
+| `LLM_PROVIDER` | no | `anthropic` (default), `openai` or `gemini` |
+| `LLM_API_KEY` | no | Provider API key; the AI endpoint answers 503 without it |
+| `LLM_MODEL` | for openai/gemini | Model name. Anthropic defaults to `claude-opus-5-5` |
+| `LLM_BASE_URL` | no | Endpoint override (proxy or OpenAI-compatible server) |
 
 ## Architecture
 
@@ -99,7 +101,7 @@ Server pushes: `doc:presence` (`{ documentId, users }`), `notification:new` (to 
 
 ## AI assistant
 
-`POST /api/ai/assist` with `action` (`generate`, `debug`, `explain`, `improve`) plus any of `prompt`, `selection`, `errorLog` and an optional `documentId` for context. It calls Claude through the official Anthropic SDK (`LLM_API_KEY`, `LLM_MODEL`), is limited to 10 requests per user per minute, and answers 503 when no key is configured. The vendor sits behind the `LlmProvider` interface in `src/module/ai/llm.provider.ts`.
+`POST /api/ai/assist` with `action` (`generate`, `debug`, `explain`, `improve`) plus any of `prompt`, `selection`, `errorLog` and an optional `documentId` for context. The vendor is chosen with `LLM_PROVIDER` (`anthropic`, `openai` or `gemini`), each through its official SDK, and is configured with `LLM_API_KEY` and `LLM_MODEL`. It is limited to 10 requests per user per minute, and answers 503 when no key is configured. To add another vendor, implement `LlmProvider` (`src/module/ai/llm.provider.ts`) and add a case in `llm.factory.ts`.
 
 ## Team and ownership
 
